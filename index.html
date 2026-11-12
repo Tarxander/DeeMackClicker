@@ -158,6 +158,7 @@
       overflow-y: auto;
     }
     .item {
+      margin-bottom: 12px;
       display: flex;
       align-items: center;
       gap: 12px;
@@ -207,48 +208,71 @@
   <button id="shop-toggle" type="button">TEACHER SHOP</button>
   <aside id="shop">
     <h2>TEACHER SHOP</h2>
-    <div id="shop-items">
-      <div class="item">
-        <img src="holmgren.png" alt="Mr Holmgren">
-        <div class="item-info">
-          <div class="item-name">Mr Holmgren</div>
-          <div class="item-desc">+1 click per second</div>
-          <div class="item-owned" id="holmgren-owned">Owned: 0</div>
-        </div>
-        <button class="buy" id="buy-holmgren" type="button">5 clicks</button>
-      </div>
-    </div>
+    <div id="shop-items"></div>
   </aside>
 
   <script>
-    const HOLMGREN_COST = 5;
+    // Shop items. Add more teachers here.
+    const TEACHERS = [
+      { id: 'holmgren', name: 'Mr Holmgren', img: 'holmgren.png', cost: 5,  perSecond: 1,  width: 48, saveKey: 'holmgrens' },
+      { id: 'davis',    name: 'Mr. Davis',   img: 'davis.png',    cost: 30, perSecond: 10, width: 58, saveKey: 'davis' },
+    ];
 
     const countEl = document.getElementById('count');
     const rateEl = document.getElementById('rate');
     const img = document.getElementById('clicker');
     const arena = document.getElementById('arena');
-    const buyBtn = document.getElementById('buy-holmgren');
-    const ownedEl = document.getElementById('holmgren-owned');
+    const shopItems = document.getElementById('shop-items');
 
     let count = 0;
-    let holmgrens = 0;
-    try {
-      count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0;
-      holmgrens = parseInt(localStorage.getItem('holmgrens'), 10) || 0;
-    } catch (e) {}
+    const owned = {};
+    try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
+    TEACHERS.forEach(t => {
+      owned[t.id] = 0;
+      try { owned[t.id] = parseInt(localStorage.getItem(t.saveKey), 10) || 0; } catch (e) {}
+    });
 
     function save() {
       try {
         localStorage.setItem('gamesBlocked', count);
-        localStorage.setItem('holmgrens', holmgrens);
+        TEACHERS.forEach(t => localStorage.setItem(t.saveKey, owned[t.id]));
       } catch (e) {}
     }
 
+    // Build shop
+    const ui = {};
+    TEACHERS.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'item';
+      item.innerHTML =
+        '<img src="' + t.img + '" alt="' + t.name + '">' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + t.name + '</div>' +
+          '<div class="item-desc">+' + t.perSecond + ' click' + (t.perSecond === 1 ? '' : 's') + ' per second</div>' +
+          '<div class="item-owned">Owned: 0</div>' +
+        '</div>' +
+        '<button class="buy" type="button">' + t.cost + ' clicks</button>';
+      shopItems.appendChild(item);
+      const btn = item.querySelector('.buy');
+      ui[t.id] = { btn, ownedEl: item.querySelector('.item-owned') };
+      btn.addEventListener('click', () => {
+        if (count < t.cost) return;
+        count -= t.cost;
+        owned[t.id]++;
+        save();
+        render();
+        addHelper(t);
+      });
+    });
+
     function render() {
       countEl.textContent = count.toLocaleString();
-      rateEl.textContent = holmgrens > 0 ? holmgrens + ' per second' : '';
-      ownedEl.textContent = 'Owned: ' + holmgrens;
-      buyBtn.disabled = count < HOLMGREN_COST;
+      const rate = TEACHERS.reduce((sum, t) => sum + owned[t.id] * t.perSecond, 0);
+      rateEl.textContent = rate > 0 ? rate.toLocaleString() + ' per second' : '';
+      TEACHERS.forEach(t => {
+        ui[t.id].ownedEl.textContent = 'Owned: ' + owned[t.id];
+        ui[t.id].btn.disabled = count < t.cost;
+      });
     }
 
     function addClicks(n) {
@@ -282,7 +306,7 @@
     img.addEventListener('pointerleave', release);
     img.addEventListener('pointercancel', release);
 
-    // Mr Holmgren helpers
+    // Teacher helpers standing around the clicker
     const helpers = [];
 
     // Spots around the clicker (as fractions of the arena's width/height).
@@ -307,16 +331,17 @@
       });
     }
 
-    function addHelper() {
+    function addHelper(teacher) {
       const el = document.createElement('div');
       el.className = 'helper';
-      el.innerHTML = '<img src="holmgren.png" alt="" draggable="false">';
+      el.style.width = teacher.width + 'px';
+      el.innerHTML = '<img src="' + teacher.img + '" alt="" draggable="false">';
       arena.appendChild(el);
-      const helper = { el };
+      const helper = { el, teacher };
       helpers.push(helper);
       layoutHelpers();
 
-      // Each Mr Holmgren hits once per second, staggered so they don't all sync up
+      // Each teacher hits once per second, staggered so they don't all sync up
       const offset = Math.random() * 1000;
       setTimeout(() => {
         helperHit(helper);
@@ -332,7 +357,7 @@
 
       // Land the hit partway through the swing
       setTimeout(() => {
-        addClicks(1);
+        addClicks(helper.teacher.perSecond);
         img.classList.remove('bonk');
         void img.offsetWidth;
         img.classList.add('bonk');
@@ -344,22 +369,13 @@
       }, 160);
     }
 
-    buyBtn.addEventListener('click', () => {
-      if (count < HOLMGREN_COST) return;
-      count -= HOLMGREN_COST;
-      holmgrens++;
-      save();
-      render();
-      addHelper();
-    });
-
     // Shop open/close
     document.getElementById('shop-toggle').addEventListener('click', () => {
       document.body.classList.toggle('shop-open');
     });
 
     // Restore saved helpers
-    for (let i = 0; i < holmgrens; i++) addHelper();
+    TEACHERS.forEach(t => { for (let i = 0; i < owned[t.id]; i++) addHelper(t); });
     render();
   </script>
 </body>
