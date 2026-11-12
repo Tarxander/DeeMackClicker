@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeeMack Clicker</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #ffffff;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #222;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #count {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    #label {
+      font-size: 24px;
+      margin: 8px 0 24px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #555;
+    }
+    #clicker {
+      width: min(320px, 80vw);
+      cursor: pointer;
+      border-radius: 16px;
+      transition: transform 0.1s ease-out;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #clicker.pressed {
+      transform: scale(0.9);
+    }
+  </style>
+</head>
+<body>
+  <div id="count">0</div>
+  <div id="label">Games Blocked</div>
+  <img id="clicker" src="deemack.png" alt="Click me!" draggable="false">
+
+  <script>
+    const countEl = document.getElementById('count');
+    const img = document.getElementById('clicker');
+
+    let count = 0;
+    try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
+    countEl.textContent = count.toLocaleString();
+
+    img.addEventListener('pointerdown', () => {
+      count++;
+      countEl.textContent = count.toLocaleString();
+      try { localStorage.setItem('gamesBlocked', count); } catch (e) {}
+      img.classList.add('pressed');
+    });
+
+    const release = () => img.classList.remove('pressed');
+    img.addEventListener('pointerup', release);
+    img.addEventListener('pointerleave', release);
+    img.addEventListener('pointercancel', release);
+  </script>
+</body>
+</html>
