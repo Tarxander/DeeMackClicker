@@ -11,6 +11,7 @@
       background: #ffffff;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
       color: #222;
+      overflow: hidden;
     }
     body {
       display: flex;
@@ -27,21 +28,66 @@
     }
     #label {
       font-size: 24px;
-      margin: 8px 0 24px;
+      margin: 8px 0 4px;
       text-transform: uppercase;
       letter-spacing: 2px;
       color: #555;
     }
+    #rate {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 24px;
+      min-height: 18px;
+    }
+
+    /* Clicker + helpers */
+    #arena {
+      position: relative;
+      width: min(320px, 60vw);
+    }
     #clicker {
-      width: min(320px, 80vw);
+      display: block;
+      width: 100%;
       cursor: pointer;
       border-radius: 16px;
       transition: transform 0.1s ease-out;
       -webkit-tap-highlight-color: transparent;
+      position: relative;
+      z-index: 1;
     }
     #clicker.pressed {
       transform: scale(0.9);
     }
+    #clicker.bonk {
+      animation: bonk 0.2s ease-out;
+    }
+    @keyframes bonk {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(0.94); }
+      100% { transform: scale(1); }
+    }
+    .helper {
+      position: absolute;
+      width: 48px;
+      pointer-events: none;
+      z-index: 2;
+      transform: translate(-50%, -50%);
+    }
+    .helper img {
+      display: block;
+      width: 100%;
+      transform-origin: 50% 80%;
+    }
+    .helper.hit img {
+      animation: hit 0.35s ease-in-out;
+    }
+    @keyframes hit {
+      0%   { transform: translate(0, 0) rotate(0deg); }
+      45%  { transform: translate(var(--hx), var(--hy)) rotate(var(--hr)); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    /* Falling BLOCKED text */
     .blocked-pop {
       position: fixed;
       pointer-events: none;
@@ -53,28 +99,167 @@
       animation: fall 1.8s ease-in forwards;
       z-index: 10;
     }
+    .blocked-pop.small {
+      font-size: 18px;
+    }
     @keyframes fall {
       0%   { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)); }
       100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + 220px)) rotate(var(--rot-end)); }
+    }
+
+    /* Shop sidebar */
+    #shop-toggle {
+      position: fixed;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      writing-mode: vertical-rl;
+      background: #1d3557;
+      color: #fff;
+      border: none;
+      padding: 18px 10px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      border-radius: 10px 0 0 10px;
+      cursor: pointer;
+      z-index: 30;
+      transition: right 0.3s ease;
+      font-family: inherit;
+    }
+    #shop {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100%;
+      width: min(300px, 80vw);
+      background: #f6f7f9;
+      border-left: 1px solid #ddd;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+    }
+    body.shop-open #shop { transform: translateX(0); }
+    body.shop-open #shop-toggle { right: min(300px, 80vw); }
+    #shop h2 {
+      margin: 0;
+      padding: 20px 16px;
+      font-size: 22px;
+      letter-spacing: 3px;
+      text-align: center;
+      background: #1d3557;
+      color: #fff;
+    }
+    #shop-items {
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .item img {
+      width: 44px;
+      height: 64px;
+      object-fit: cover;
+      object-position: top;
+      border-radius: 8px;
+      background: #eee;
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-weight: 800; font-size: 16px; }
+    .item-desc { font-size: 13px; color: #666; }
+    .item-owned { font-size: 12px; color: #999; margin-top: 2px; }
+    .buy {
+      background: #2a9d8f;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .buy:disabled {
+      background: #bbb;
+      cursor: not-allowed;
     }
   </style>
 </head>
 <body>
   <div id="count">0</div>
   <div id="label">Games Blocked</div>
-  <img id="clicker" src="deemack.png" alt="Click me!" draggable="false">
+  <div id="rate"></div>
+  <div id="arena">
+    <img id="clicker" src="deemack.png" alt="Click me!" draggable="false">
+  </div>
+
+  <button id="shop-toggle" type="button">TEACHER SHOP</button>
+  <aside id="shop">
+    <h2>TEACHER SHOP</h2>
+    <div id="shop-items">
+      <div class="item">
+        <img src="holmgren.png" alt="Mr Holmgren">
+        <div class="item-info">
+          <div class="item-name">Mr Holmgren</div>
+          <div class="item-desc">+1 click per second</div>
+          <div class="item-owned" id="holmgren-owned">Owned: 0</div>
+        </div>
+        <button class="buy" id="buy-holmgren" type="button">5 clicks</button>
+      </div>
+    </div>
+  </aside>
 
   <script>
+    const HOLMGREN_COST = 5;
+
     const countEl = document.getElementById('count');
+    const rateEl = document.getElementById('rate');
     const img = document.getElementById('clicker');
+    const arena = document.getElementById('arena');
+    const buyBtn = document.getElementById('buy-holmgren');
+    const ownedEl = document.getElementById('holmgren-owned');
 
     let count = 0;
-    try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
-    countEl.textContent = count.toLocaleString();
+    let holmgrens = 0;
+    try {
+      count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0;
+      holmgrens = parseInt(localStorage.getItem('holmgrens'), 10) || 0;
+    } catch (e) {}
 
-    function spawnBlocked(x, y) {
+    function save() {
+      try {
+        localStorage.setItem('gamesBlocked', count);
+        localStorage.setItem('holmgrens', holmgrens);
+      } catch (e) {}
+    }
+
+    function render() {
+      countEl.textContent = count.toLocaleString();
+      rateEl.textContent = holmgrens > 0 ? holmgrens + ' per second' : '';
+      ownedEl.textContent = 'Owned: ' + holmgrens;
+      buyBtn.disabled = count < HOLMGREN_COST;
+    }
+
+    function addClicks(n) {
+      count += n;
+      save();
+      render();
+    }
+
+    function spawnBlocked(x, y, small) {
       const el = document.createElement('div');
-      el.className = 'blocked-pop';
+      el.className = 'blocked-pop' + (small ? ' small' : '');
       el.textContent = 'BLOCKED';
       el.style.left = x + 'px';
       el.style.top = y + 'px';
@@ -86,18 +271,96 @@
       document.body.appendChild(el);
     }
 
+    // Manual clicking
     img.addEventListener('pointerdown', (e) => {
       spawnBlocked(e.clientX, e.clientY);
-      count++;
-      countEl.textContent = count.toLocaleString();
-      try { localStorage.setItem('gamesBlocked', count); } catch (e) {}
+      addClicks(1);
       img.classList.add('pressed');
     });
-
     const release = () => img.classList.remove('pressed');
     img.addEventListener('pointerup', release);
     img.addEventListener('pointerleave', release);
     img.addEventListener('pointercancel', release);
+
+    // Mr Holmgren helpers
+    const helpers = [];
+
+    // Spots around the clicker (as fractions of the arena's width/height).
+    // First one sits to the left, then right, then they fill in around.
+    function helperSpot(i) {
+      const angles = [180, 0, 225, 315, 135, 45, 270, 90];
+      const ring = Math.floor(i / angles.length);
+      const angle = (angles[i % angles.length] + ring * 22.5) * Math.PI / 180;
+      const r = 0.62 + ring * 0.14;
+      return { x: 0.5 + Math.cos(angle) * r, y: 0.5 - Math.sin(angle) * r * 0.85, angle };
+    }
+
+    function layoutHelpers() {
+      helpers.forEach((h, i) => {
+        const s = helperSpot(i);
+        h.el.style.left = (s.x * 100) + '%';
+        h.el.style.top = (s.y * 100) + '%';
+        // Lunge toward the clicker's center
+        h.el.style.setProperty('--hx', (-Math.cos(s.angle) * 22) + 'px');
+        h.el.style.setProperty('--hy', (Math.sin(s.angle) * 22) + 'px');
+        h.el.style.setProperty('--hr', (Math.cos(s.angle) >= 0 ? -20 : 20) + 'deg');
+      });
+    }
+
+    function addHelper() {
+      const el = document.createElement('div');
+      el.className = 'helper';
+      el.innerHTML = '<img src="holmgren.png" alt="" draggable="false">';
+      arena.appendChild(el);
+      const helper = { el };
+      helpers.push(helper);
+      layoutHelpers();
+
+      // Each Mr Holmgren hits once per second, staggered so they don't all sync up
+      const offset = Math.random() * 1000;
+      setTimeout(() => {
+        helperHit(helper);
+        setInterval(() => helperHit(helper), 1000);
+      }, offset);
+    }
+
+    function helperHit(helper) {
+      const el = helper.el;
+      el.classList.remove('hit');
+      void el.offsetWidth; // restart animation
+      el.classList.add('hit');
+
+      // Land the hit partway through the swing
+      setTimeout(() => {
+        addClicks(1);
+        img.classList.remove('bonk');
+        void img.offsetWidth;
+        img.classList.add('bonk');
+        const a = arena.getBoundingClientRect();
+        const h = el.getBoundingClientRect();
+        const x = h.left + h.width / 2 + (a.left + a.width / 2 - (h.left + h.width / 2)) * 0.35;
+        const y = h.top + h.height / 2 + (a.top + a.height / 2 - (h.top + h.height / 2)) * 0.35;
+        spawnBlocked(x, y, true);
+      }, 160);
+    }
+
+    buyBtn.addEventListener('click', () => {
+      if (count < HOLMGREN_COST) return;
+      count -= HOLMGREN_COST;
+      holmgrens++;
+      save();
+      render();
+      addHelper();
+    });
+
+    // Shop open/close
+    document.getElementById('shop-toggle').addEventListener('click', () => {
+      document.body.classList.toggle('shop-open');
+    });
+
+    // Restore saved helpers
+    for (let i = 0; i < holmgrens; i++) addHelper();
+    render();
   </script>
 </body>
 </html>
