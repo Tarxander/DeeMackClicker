@@ -42,6 +42,21 @@
     #clicker.pressed {
       transform: scale(0.9);
     }
+    .blocked-pop {
+      position: fixed;
+      pointer-events: none;
+      font-weight: 900;
+      font-size: 28px;
+      color: #d62828;
+      letter-spacing: 1px;
+      transform: translate(-50%, -50%);
+      animation: fall 1.8s ease-in forwards;
+      z-index: 10;
+    }
+    @keyframes fall {
+      0%   { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)); }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + 220px)) rotate(var(--rot-end)); }
+    }
   </style>
 </head>
 <body>
@@ -57,7 +72,22 @@
     try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
     countEl.textContent = count.toLocaleString();
 
-    img.addEventListener('pointerdown', () => {
+    function spawnBlocked(x, y) {
+      const el = document.createElement('div');
+      el.className = 'blocked-pop';
+      el.textContent = 'BLOCKED';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      const rot = (Math.random() * 20 - 10);
+      el.style.setProperty('--rot', rot + 'deg');
+      el.style.setProperty('--rot-end', (rot + Math.random() * 40 - 20) + 'deg');
+      el.style.setProperty('--dx', (Math.random() * 80 - 40) + 'px');
+      el.addEventListener('animationend', () => el.remove());
+      document.body.appendChild(el);
+    }
+
+    img.addEventListener('pointerdown', (e) => {
+      spawnBlocked(e.clientX, e.clientY);
       count++;
       countEl.textContent = count.toLocaleString();
       try { localStorage.setItem('gamesBlocked', count); } catch (e) {}
