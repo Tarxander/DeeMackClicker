@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeeMack Clicker</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #ffffff;
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      color: #222;
+      overflow: hidden;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    #count {
+      font-size: 64px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    #label {
+      font-size: 24px;
+      margin: 8px 0 4px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: #555;
+    }
+    #rate {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 24px;
+      min-height: 18px;
+    }
+
+    /* Clicker + helpers */
+    #arena {
+      position: relative;
+      width: min(320px, 60vw);
+    }
+    #clicker {
+      display: block;
+      width: 100%;
+      cursor: pointer;
+      border-radius: 16px;
+      transition: transform 0.1s ease-out;
+      -webkit-tap-highlight-color: transparent;
+      position: relative;
+      z-index: 1;
+    }
+    #clicker.pressed {
+      transform: scale(0.9);
+    }
+    #clicker.bonk {
+      animation: bonk 0.2s ease-out;
+    }
+    @keyframes bonk {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(0.94); }
+      100% { transform: scale(1); }
+    }
+    .helper {
+      position: absolute;
+      width: 48px;
+      pointer-events: none;
+      z-index: 2;
+      transform: translate(-50%, -50%);
+    }
+    .helper img {
+      display: block;
+      width: 100%;
+      transform-origin: 50% 80%;
+    }
+    .helper.hit img {
+      animation: hit 0.35s ease-in-out;
+    }
+    @keyframes hit {
+      0%   { transform: translate(0, 0) rotate(0deg); }
+      45%  { transform: translate(var(--hx), var(--hy)) rotate(var(--hr)); }
+      100% { transform: translate(0, 0) rotate(0deg); }
+    }
+
+    /* Falling BLOCKED text */
+    .blocked-pop {
+      position: fixed;
+      pointer-events: none;
+      font-weight: 900;
+      font-size: 28px;
+      color: #d62828;
+      letter-spacing: 1px;
+      transform: translate(-50%, -50%);
+      animation: fall 1.8s ease-in forwards;
+      z-index: 10;
+    }
+    .blocked-pop.small {
+      font-size: 18px;
+    }
+    @keyframes fall {
+      0%   { opacity: 1; transform: translate(-50%, -50%) rotate(var(--rot)); }
+      100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + 220px)) rotate(var(--rot-end)); }
+    }
+
+    /* Shop sidebar */
+    #shop-toggle {
+      position: fixed;
+      top: 50%;
+      right: 0;
+      transform: translateY(-50%);
+      writing-mode: vertical-rl;
+      background: #1d3557;
+      color: #fff;
+      border: none;
+      padding: 18px 10px;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 3px;
+      border-radius: 10px 0 0 10px;
+      cursor: pointer;
+      z-index: 30;
+      transition: right 0.3s ease;
+      font-family: inherit;
+    }
+    #shop {
+      position: fixed;
+      top: 0;
+      right: 0;
+      height: 100%;
+      width: min(300px, 80vw);
+      background: #f6f7f9;
+      border-left: 1px solid #ddd;
+      box-shadow: -4px 0 16px rgba(0,0,0,0.08);
+      transform: translateX(100%);
+      transition: transform 0.3s ease;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+    }
+    body.shop-open #shop { transform: translateX(0); }
+    body.shop-open #shop-toggle { right: min(300px, 80vw); }
+    #shop h2 {
+      margin: 0;
+      padding: 20px 16px;
+      font-size: 22px;
+      letter-spacing: 3px;
+      text-align: center;
+      background: #1d3557;
+      color: #fff;
+    }
+    #shop-items {
+      padding: 16px;
+      overflow-y: auto;
+    }
+    .item {
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 12px;
+      padding: 10px;
+    }
+    .item img {
+      width: 44px;
+      height: 64px;
+      object-fit: cover;
+      object-position: top;
+      border-radius: 8px;
+      background: #eee;
+    }
+    .item-info { flex: 1; min-width: 0; }
+    .item-name { font-weight: 800; font-size: 16px; }
+    .item-desc { font-size: 13px; color: #666; }
+    .item-owned { font-size: 12px; color: #999; margin-top: 2px; }
+    .buy {
+      background: #2a9d8f;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: inherit;
+    }
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .upgrade {
+      background: #e76f51;
+    }
+    .buy:disabled {
+      background: #bbb;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body>
+  <div id="count">0</div>
+  <div id="label">Games Blocked</div>
+  <div id="rate"></div>
+  <div id="arena">
+    <img id="clicker" src="deemack.png" alt="Click me!" draggable="false">
+  </div>
+
+  <button id="shop-toggle" type="button">TEACHER SHOP</button>
+  <aside id="shop">
+    <h2>TEACHER SHOP</h2>
+    <div id="shop-items"></div>
+  </aside>
+
+  <script>
+    // Shop items. Add more teachers here.
+    const TEACHERS = [
+      { id: 'holmgren', name: 'Mr Holmgren', img: 'holmgren.png', cost: 5,  perSecond: 1,  width: 48, saveKey: 'holmgrens' },
+      { id: 'davis',    name: 'Mr. Davis',   img: 'davis.png',    cost: 30, perSecond: 10, width: 58, saveKey: 'davis' },
+      { id: 'final',    name: 'Final Teacher', img: 'final-teacher.png', cost: 100, perSecond: 100, width: 70, saveKey: 'finalTeacher' },
+    ];
+
+    const countEl = document.getElementById('count');
+    const rateEl = document.getElementById('rate');
+    const img = document.getElementById('clicker');
+    const arena = document.getElementById('arena');
+    const shopItems = document.getElementById('shop-items');
+
+    let count = 0;
+    const owned = {};
+    const level = {};
+    try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
+    TEACHERS.forEach(t => {
+      owned[t.id] = 0;
+      level[t.id] = 1;
+      try {
+        owned[t.id] = parseInt(localStorage.getItem(t.saveKey), 10) || 0;
+        level[t.id] = parseInt(localStorage.getItem(t.saveKey + '_level'), 10) || 1;
+      } catch (e) {}
+    });
+
+    // Each upgrade doubles the teacher's clicks per second and doubles the upgrade price.
+    // Upgrade price starts at 1 click: 1, 2, 4, 8, ...
+    const perSecondOf = t => t.perSecond * Math.pow(2, level[t.id] - 1);
+    const upgradeCostOf = t => Math.pow(2, level[t.id] - 1);
+
+    function save() {
+      try {
+        localStorage.setItem('gamesBlocked', count);
+        TEACHERS.forEach(t => {
+          localStorage.setItem(t.saveKey, owned[t.id]);
+          localStorage.setItem(t.saveKey + '_level', level[t.id]);
+        });
+      } catch (e) {}
+    }
+
+    // Build shop
+    const ui = {};
+    TEACHERS.forEach(t => {
+      const item = document.createElement('div');
+      item.className = 'item';
+      item.innerHTML =
+        '<img src="' + t.img + '" alt="' + t.name + '">' +
+        '<div class="item-info">' +
+          '<div class="item-name">' + t.name + '</div>' +
+          '<div class="item-desc"></div>' +
+          '<div class="item-owned"></div>' +
+        '</div>' +
+        '<div class="buttons">' +
+          '<button class="buy buy-teacher" type="button">Buy: ' + t.cost + '</button>' +
+          '<button class="buy upgrade" type="button"></button>' +
+        '</div>';
+      shopItems.appendChild(item);
+      const btn = item.querySelector('.buy-teacher');
+      const upBtn = item.querySelector('.upgrade');
+      ui[t.id] = { btn, upBtn, descEl: item.querySelector('.item-desc'), ownedEl: item.querySelector('.item-owned') };
+      upBtn.addEventListener('click', () => {
+        const price = upgradeCostOf(t);
+        if (count < price) return;
+        count -= price;
+        level[t.id]++;
+        save();
+        render();
+      });
+      btn.addEventListener('click', () => {
+        if (count < t.cost) return;
+        count -= t.cost;
+        owned[t.id]++;
+        save();
+        render();
+        addHelper(t);
+      });
+    });
+
+    function render() {
+      countEl.textContent = count.toLocaleString();
+      const rate = TEACHERS.reduce((sum, t) => sum + owned[t.id] * perSecondOf(t), 0);
+      rateEl.textContent = rate > 0 ? rate.toLocaleString() + ' per second' : '';
+      TEACHERS.forEach(t => {
+        const u = ui[t.id];
+        const ps = perSecondOf(t);
+        u.descEl.textContent = '+' + ps.toLocaleString() + ' click' + (ps === 1 ? '' : 's') + ' per second';
+        u.ownedEl.textContent = 'Owned: ' + owned[t.id] + ' · Level ' + level[t.id];
+        u.btn.disabled = count < t.cost;
+        u.upBtn.textContent = 'Upgrade: ' + upgradeCostOf(t).toLocaleString();
+        u.upBtn.disabled = count < upgradeCostOf(t);
+      });
+    }
+
+    function addClicks(n) {
+      count += n;
+      save();
+      render();
+    }
+
+    function spawnBlocked(x, y, small) {
+      const el = document.createElement('div');
+      el.className = 'blocked-pop' + (small ? ' small' : '');
+      el.textContent = 'BLOCKED';
+      el.style.left = x + 'px';
+      el.style.top = y + 'px';
+      const rot = (Math.random() * 20 - 10);
+      el.style.setProperty('--rot', rot + 'deg');
+      el.style.setProperty('--rot-end', (rot + Math.random() * 40 - 20) + 'deg');
+      el.style.setProperty('--dx', (Math.random() * 80 - 40) + 'px');
+      el.addEventListener('animationend', () => el.remove());
+      document.body.appendChild(el);
+    }
+
+    // Manual clicking
+    img.addEventListener('pointerdown', (e) => {
+      spawnBlocked(e.clientX, e.clientY);
+      addClicks(1);
+      img.classList.add('pressed');
+    });
+    const release = () => img.classList.remove('pressed');
+    img.addEventListener('pointerup', release);
+    img.addEventListener('pointerleave', release);
+    img.addEventListener('pointercancel', release);
+
+    // Teacher helpers standing around the clicker
+    const helpers = [];
+
+    // Spots around the clicker (as fractions of the arena's width/height).
+    // First one sits to the left, then right, then they fill in around.
+    function helperSpot(i) {
+      const angles = [180, 0, 225, 315, 135, 45, 270, 90];
+      const ring = Math.floor(i / angles.length);
+      const angle = (angles[i % angles.length] + ring * 22.5) * Math.PI / 180;
+      const r = 0.62 + ring * 0.14;
+      return { x: 0.5 + Math.cos(angle) * r, y: 0.5 - Math.sin(angle) * r * 0.85, angle };
+    }
+
+    function layoutHelpers() {
+      helpers.forEach((h, i) => {
+        const s = helperSpot(i);
+        h.el.style.left = (s.x * 100) + '%';
+        h.el.style.top = (s.y * 100) + '%';
+        // Lunge toward the clicker's center
+        h.el.style.setProperty('--hx', (-Math.cos(s.angle) * 22) + 'px');
+        h.el.style.setProperty('--hy', (Math.sin(s.angle) * 22) + 'px');
+        h.el.style.setProperty('--hr', (Math.cos(s.angle) >= 0 ? -20 : 20) + 'deg');
+      });
+    }
+
+    function addHelper(teacher) {
+      const el = document.createElement('div');
+      el.className = 'helper';
+      el.style.width = teacher.width + 'px';
+      el.innerHTML = '<img src="' + teacher.img + '" alt="" draggable="false">';
+      arena.appendChild(el);
+      const helper = { el, teacher };
+      helpers.push(helper);
+      layoutHelpers();
+
+      // Each teacher hits once per second, staggered so they don't all sync up
+      const offset = Math.random() * 1000;
+      setTimeout(() => {
+        helperHit(helper);
+        setInterval(() => helperHit(helper), 1000);
+      }, offset);
+    }
+
+    function helperHit(helper) {
+      const el = helper.el;
+      el.classList.remove('hit');
+      void el.offsetWidth; // restart animation
+      el.classList.add('hit');
+
+      // Land the hit partway through the swing
+      setTimeout(() => {
+        addClicks(perSecondOf(helper.teacher));
+        img.classList.remove('bonk');
+        void img.offsetWidth;
+        img.classList.add('bonk');
+        const a = arena.getBoundingClientRect();
+        const h = el.getBoundingClientRect();
+        const x = h.left + h.width / 2 + (a.left + a.width / 2 - (h.left + h.width / 2)) * 0.35;
+        const y = h.top + h.height / 2 + (a.top + a.height / 2 - (h.top + h.height / 2)) * 0.35;
+        spawnBlocked(x, y, true);
+      }, 160);
+    }
+
+    // Shop open/close
+    document.getElementById('shop-toggle').addEventListener('click', () => {
+      document.body.classList.toggle('shop-open');
+    });
+
+    // Restore saved helpers
+    TEACHERS.forEach(t => { for (let i = 0; i < owned[t.id]; i++) addHelper(t); });
+    render();
+  </script>
+</body>
+</html>
