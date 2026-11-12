@@ -191,6 +191,14 @@
       white-space: nowrap;
       font-family: inherit;
     }
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .upgrade {
+      background: #e76f51;
+    }
     .buy:disabled {
       background: #bbb;
       cursor: not-allowed;
@@ -227,16 +235,29 @@
 
     let count = 0;
     const owned = {};
+    const level = {};
     try { count = parseInt(localStorage.getItem('gamesBlocked'), 10) || 0; } catch (e) {}
     TEACHERS.forEach(t => {
       owned[t.id] = 0;
-      try { owned[t.id] = parseInt(localStorage.getItem(t.saveKey), 10) || 0; } catch (e) {}
+      level[t.id] = 1;
+      try {
+        owned[t.id] = parseInt(localStorage.getItem(t.saveKey), 10) || 0;
+        level[t.id] = parseInt(localStorage.getItem(t.saveKey + '_level'), 10) || 1;
+      } catch (e) {}
     });
+
+    // Each upgrade doubles the teacher's clicks per second and doubles the upgrade price.
+    // Upgrade price starts at 1 click: 1, 2, 4, 8, ...
+    const perSecondOf = t => t.perSecond * Math.pow(2, level[t.id] - 1);
+    const upgradeCostOf = t => Math.pow(2, level[t.id] - 1);
 
     function save() {
       try {
         localStorage.setItem('gamesBlocked', count);
-        TEACHERS.forEach(t => localStorage.setItem(t.saveKey, owned[t.id]));
+        TEACHERS.forEach(t => {
+          localStorage.setItem(t.saveKey, owned[t.id]);
+          localStorage.setItem(t.saveKey + '_level', level[t.id]);
+        });
       } catch (e) {}
     }
 
@@ -249,13 +270,25 @@
         '<img src="' + t.img + '" alt="' + t.name + '">' +
         '<div class="item-info">' +
           '<div class="item-name">' + t.name + '</div>' +
-          '<div class="item-desc">+' + t.perSecond + ' click' + (t.perSecond === 1 ? '' : 's') + ' per second</div>' +
-          '<div class="item-owned">Owned: 0</div>' +
+          '<div class="item-desc"></div>' +
+          '<div class="item-owned"></div>' +
         '</div>' +
-        '<button class="buy" type="button">' + t.cost + ' clicks</button>';
+        '<div class="buttons">' +
+          '<button class="buy buy-teacher" type="button">Buy: ' + t.cost + '</button>' +
+          '<button class="buy upgrade" type="button"></button>' +
+        '</div>';
       shopItems.appendChild(item);
-      const btn = item.querySelector('.buy');
-      ui[t.id] = { btn, ownedEl: item.querySelector('.item-owned') };
+      const btn = item.querySelector('.buy-teacher');
+      const upBtn = item.querySelector('.upgrade');
+      ui[t.id] = { btn, upBtn, descEl: item.querySelector('.item-desc'), ownedEl: item.querySelector('.item-owned') };
+      upBtn.addEventListener('click', () => {
+        const price = upgradeCostOf(t);
+        if (count < price) return;
+        count -= price;
+        level[t.id]++;
+        save();
+        render();
+      });
       btn.addEventListener('click', () => {
         if (count < t.cost) return;
         count -= t.cost;
@@ -268,11 +301,16 @@
 
     function render() {
       countEl.textContent = count.toLocaleString();
-      const rate = TEACHERS.reduce((sum, t) => sum + owned[t.id] * t.perSecond, 0);
+      const rate = TEACHERS.reduce((sum, t) => sum + owned[t.id] * perSecondOf(t), 0);
       rateEl.textContent = rate > 0 ? rate.toLocaleString() + ' per second' : '';
       TEACHERS.forEach(t => {
-        ui[t.id].ownedEl.textContent = 'Owned: ' + owned[t.id];
-        ui[t.id].btn.disabled = count < t.cost;
+        const u = ui[t.id];
+        const ps = perSecondOf(t);
+        u.descEl.textContent = '+' + ps.toLocaleString() + ' click' + (ps === 1 ? '' : 's') + ' per second';
+        u.ownedEl.textContent = 'Owned: ' + owned[t.id] + ' · Level ' + level[t.id];
+        u.btn.disabled = count < t.cost;
+        u.upBtn.textContent = 'Upgrade: ' + upgradeCostOf(t).toLocaleString();
+        u.upBtn.disabled = count < upgradeCostOf(t);
       });
     }
 
@@ -358,7 +396,7 @@
 
       // Land the hit partway through the swing
       setTimeout(() => {
-        addClicks(helper.teacher.perSecond);
+        addClicks(perSecondOf(helper.teacher));
         img.classList.remove('bonk');
         void img.offsetWidth;
         img.classList.add('bonk');
